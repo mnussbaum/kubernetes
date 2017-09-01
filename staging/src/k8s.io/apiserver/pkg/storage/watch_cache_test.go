@@ -352,7 +352,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
 		},
 	}
-	r := cache.NewReflector(lw, &v1.Pod{}, store, 0)
+	r := cache.NewReflector(lw, &v1.Pod{}, store, 0, make(chan error))
 	r.ListAndWatch(wait.NeverStop)
 
 	{

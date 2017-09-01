@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+        "runtime/debug"
+	"github.com/golang/glog"
 )
 
 // HealthzChecker is a named healthz checker.
@@ -33,6 +35,7 @@ var defaultHealthz = sync.Once{}
 
 // DefaultHealthz installs the default healthz check to the http.DefaultServeMux.
 func DefaultHealthz(checks ...HealthzChecker) {
+        glog.V(1).Infof("In default healthz WOO\n")
 	defaultHealthz.Do(func() {
 		InstallHandler(http.DefaultServeMux, checks...)
 	})
@@ -63,8 +66,10 @@ func InstallHandler(mux mux, checks ...HealthzChecker) {
 	if len(checks) == 0 {
 		checks = []HealthzChecker{PingHealthz}
 	}
+        glog.V(1).Infof("INSTALLING CHECKS WOO!\n")
 	mux.Handle("/healthz", handleRootHealthz(checks...))
 	for _, check := range checks {
+                glog.V(1).Infof("WOO! %v\n", check.Name())
 		mux.Handle(fmt.Sprintf("/healthz/%v", check.Name()), adaptCheckToHandler(check.Check))
 	}
 }
@@ -96,6 +101,9 @@ func handleRootHealthz(checks ...HealthzChecker) http.HandlerFunc {
 		failed := false
 		var verboseOut bytes.Buffer
 		for _, check := range checks {
+                        debug.PrintStack()
+
+                        glog.V(1).Infof("CHECK NAME WOO: %v\n", check.Name())
 			if check.Check(r) != nil {
 				// don't include the error since this endpoint is public.  If someone wants more detail
 				// they should have explicit permission to the detailed checks.

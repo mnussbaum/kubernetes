@@ -77,6 +77,7 @@ type controller struct {
 	reflector      *Reflector
 	reflectorMutex sync.RWMutex
 	clock          clock.Clock
+        healthErrChan  chan error // What should use this??
 }
 
 type Controller interface {
@@ -88,8 +89,9 @@ type Controller interface {
 // New makes a new Controller from the given Config.
 func New(c *Config) Controller {
 	ctlr := &controller{
-		config: *c,
-		clock:  &clock.RealClock{},
+		config:        *c,
+		clock:         &clock.RealClock{},
+                healthErrChan: make(chan error),
 	}
 	return ctlr
 }
@@ -108,6 +110,7 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 		c.config.ObjectType,
 		c.config.Queue,
 		c.config.FullResyncPeriod,
+                c.healthErrChan,
 	)
 	r.ShouldResync = c.config.ShouldResync
 	r.clock = c.clock

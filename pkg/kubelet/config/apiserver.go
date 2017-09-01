@@ -30,13 +30,22 @@ import (
 )
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
-func NewSourceApiserver(c clientset.Interface, nodeName types.NodeName, updates chan<- interface{}) {
+func NewSourceApiserver(
+  c clientset.Interface,
+  nodeName types.NodeName,
+  updates chan<- interface{},
+  healthErrChan chan<- error,
+) {
 	lw := cache.NewListWatchFromClient(c.Core().RESTClient(), "pods", metav1.NamespaceAll, fields.OneTermEqualSelector(api.PodHostField, string(nodeName)))
-	newSourceApiserverFromLW(lw, updates)
+	newSourceApiserverFromLW(lw, updates, healthErrChan)
 }
 
 // newSourceApiserverFromLW holds creates a config source that watches and pulls from the apiserver.
-func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}) {
+func newSourceApiserverFromLW(
+  lw cache.ListerWatcher,
+  updates chan<- interface{},
+  healthErrChan chan<- error,
+) {
 	send := func(objs []interface{}) {
 		var pods []*v1.Pod
 		for _, o := range objs {
@@ -44,6 +53,12 @@ func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}
 		}
 		updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.ApiserverSource}
 	}
-	r := cache.NewReflector(lw, &v1.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 0)
+	r := cache.NewReflector(
+          lw,
+          &v1.Pod{},
+          cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc),
+          0,
+          healthErrChan,
+        )
 	go r.Run(wait.NeverStop)
 }

@@ -118,7 +118,7 @@ func NewForConfig(c *rest.Config) (*CoreV1Client, error) {
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := rest.RESTClientFor(&config)
+	client, err := rest.RESTClientFor(&config) // this is the rest client that is fed into all the ListerWatchers that are fed into the Reflectors
 	if err != nil {
 		return nil, err
 	}

@@ -1,0 +1,25 @@
+* PLEG has healthchecks that are currently only used for node status (aka
+  runtimeState) and not HTTP healthcheck of kubelet
+
+* It looks like the pleg's Healthy call only detects if the last pod list event
+  happened more than 3 min ago. This event just gets a list from another obj,
+  should never fail, really just detects if relist goroutine isn't running
+  frequently enough
+
+* Triggering health failure on its errors should happen too, but isn't related to API errors
+
+
+* Logs for API errors:
+
+E0901 20:58:10.234969    8140 reflector.go:313] k8s.io/kubernetes/pkg/kubelet/kubelet.go:416: Failed to watch *v1.Node: Get https://localhost:6443/api/v1/nodes?fieldSelector=metadata.name%3D127.0.0.1&resourceVersion=1399&timeoutSeconds=561&watch=true: dial tcp [::1]:6443: getsocko
+pt: connection refused                                                
+E0901 20:58:10.235078    8140 reflector.go:313] k8s.io/kubernetes/pkg/kubelet/config/apiserver.go:47: Failed to watch *v1.Pod: Get https://localhost:6443/api/v1/pods?fieldSelector=spec.nodeName%3D127.0.0.1&resourceVersion=267&timeoutSeconds=554&watch=true: dial tcp [::1]:6443: get
+sockopt: connection refused                    
+
+* Many different places spin up their own Reflector, each reflector has its own
+  error handling logic. One option would be to have reflectors write to an
+  error chan that a healthz callback could pull from. If so, don't push block
+  when chan full or pull block when empty
+
+* ATM I've been threading a healthErrChan from KubeDeps to every NewReflector
+  and NewNamedReflector. Need to have read and write happening to it still

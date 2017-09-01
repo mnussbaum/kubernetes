@@ -270,6 +270,7 @@ func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
 		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
+		healthz.NamedCheck("wooo", s.wooo),
 	)
 	ws := new(restful.WebService)
 	ws.
@@ -440,6 +441,14 @@ func (s *Server) syncLoopHealthCheck(req *http.Request) error {
 	if !enterLoopTime.IsZero() && time.Now().After(enterLoopTime.Add(duration)) {
 		return fmt.Errorf("sync Loop took longer than expected")
 	}
+	return nil
+}
+
+// Checks if kubelet's wooo
+func (s *Server) wooo(req *http.Request) error {
+	// if true {
+	// 	return fmt.Errorf("sync Loop took longer than expected")
+	// }
 	return nil
 }
 

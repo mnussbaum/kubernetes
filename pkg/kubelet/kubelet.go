@@ -245,6 +245,7 @@ type Dependencies struct {
 	VolumePlugins           []volume.VolumePlugin
 	TLSOptions              *server.TLSOptions
 	KubeletConfigController *kubeletconfig.Controller
+	HealthErrChan           chan error
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -275,7 +276,12 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	}
 	if kubeDeps.KubeClient != nil {
 		glog.Infof("Watching apiserver")
-		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, cfg.Channel(kubetypes.ApiserverSource))
+		config.NewSourceApiserver(
+                  kubeDeps.KubeClient,
+                  nodeName,
+                  cfg.Channel(kubetypes.ApiserverSource),
+                  kubeDeps.HealthErrChan,
+                )
 	}
 	return cfg, nil
 }
@@ -404,7 +410,13 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	if kubeDeps.KubeClient != nil {
 		serviceLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "services", metav1.NamespaceAll, fields.Everything())
-		r := cache.NewReflector(serviceLW, &v1.Service{}, serviceIndexer, 0)
+		r := cache.NewReflector(
+                  serviceLW,
+                  &v1.Service{},
+                  serviceIndexer,
+                  0,
+                  kubeDeps.HealthErrChan,
+                )
 		go r.Run(wait.NeverStop)
 	}
 	serviceLister := corelisters.NewServiceLister(serviceIndexer)
@@ -413,7 +425,13 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if kubeDeps.KubeClient != nil {
 		fieldSelector := fields.Set{api.ObjectNameField: string(nodeName)}.AsSelector()
 		nodeLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "nodes", metav1.NamespaceAll, fieldSelector)
-		r := cache.NewReflector(nodeLW, &v1.Node{}, nodeIndexer, 0)
+		r := cache.NewReflector(
+                  nodeLW,
+                  &v1.Node{},
+                  nodeIndexer,
+                  0,
+                  kubeDeps.HealthErrChan,
+                )
 		go r.Run(wait.NeverStop)
 	}
 	nodeInfo := &predicates.CachedNodeInfo{NodeLister: corelisters.NewNodeLister(nodeIndexer)}
@@ -1718,6 +1736,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	plegCh := kl.pleg.Watch()
 	for {
 		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
+                  glog.V(1).Infof("WOO GOT RUNTIME ERRS: %v\n", rs)
 			glog.Infof("skipping pod synchronization - %v", rs)
 			time.Sleep(5 * time.Second)
 			continue
@@ -2091,7 +2110,7 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 
 // ListenAndServe runs the kubelet HTTP server.
 func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers, enableContentionProfiling bool) {
-	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, enableContentionProfiling, kl.containerRuntime, kl.criHandler)
+	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, enableContentionProfiling, kl.containerRuntime, kl.criHandler) // need to pass the reflector in here to use it for healthz in the server
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.

@@ -71,6 +71,9 @@ type Reflector struct {
 	lastSyncResourceVersion string
 	// lastSyncResourceVersionMutex guards read/write access to lastSyncResourceVersion
 	lastSyncResourceVersionMutex sync.RWMutex
+
+        // channel to send errors to trigger failed healthz if watch source is unreachable
+        healthErrChan chan<- error
 }
 
 var (
@@ -83,9 +86,14 @@ var (
 
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
 // The indexer is configured to key on namespace
-func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interface{}, resyncPeriod time.Duration) (indexer Indexer, reflector *Reflector) {
+func NewNamespaceKeyedIndexerAndReflector(
+  lw ListerWatcher,
+  expectedType interface{},
+  resyncPeriod time.Duration,
+  healthErrChan chan<- error,
+) (indexer Indexer, reflector *Reflector) {
 	indexer = NewIndexer(MetaNamespaceKeyFunc, Indexers{"namespace": MetaNamespaceIndexFunc})
-	reflector = NewReflector(lw, expectedType, indexer, resyncPeriod)
+	reflector = NewReflector(lw, expectedType, indexer, resyncPeriod, healthErrChan)
 	return indexer, reflector
 }
 
@@ -95,8 +103,21 @@ func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interfa
 // is nil. If resyncPeriod is non-zero, then lists will be executed after every
 // resyncPeriod, so that you can use reflectors to periodically process everything as
 // well as incrementally processing the things that change.
-func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
-	return NewNamedReflector(getDefaultReflectorName(internalPackages...), lw, expectedType, store, resyncPeriod)
+func NewReflector(
+  lw ListerWatcher,
+  expectedType interface{},
+  store Store,
+  resyncPeriod time.Duration,
+  healthErrChan chan<- error,
+) *Reflector {
+	return NewNamedReflector(
+          getDefaultReflectorName(internalPackages...),
+          lw,
+          expectedType,
+          store,
+          resyncPeriod,
+          healthErrChan,
+        )
 }
 
 // reflectorDisambiguator is used to disambiguate started reflectors.
@@ -104,7 +125,14 @@ func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyn
 var reflectorDisambiguator = int64(time.Now().UnixNano() % 12345)
 
 // NewNamedReflector same as NewReflector, but with a specified name for logging
-func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
+func NewNamedReflector(
+  name string,
+  lw ListerWatcher,
+  expectedType interface{},
+  store Store,
+  resyncPeriod time.Duration,
+  healthErrChan chan<- error,
+) *Reflector {
 	reflectorSuffix := atomic.AddInt64(&reflectorDisambiguator, 1)
 	r := &Reflector{
 		name: name,
@@ -116,6 +144,7 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 		period:        time.Second,
 		resyncPeriod:  resyncPeriod,
 		clock:         &clock.RealClock{},
+                healthErrChan: healthErrChan,
 	}
 	return r
 }
@@ -358,6 +387,12 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string, err
 		r.metrics.numberOfItemsInWatch.Observe(float64(eventCount))
 		r.metrics.watchDuration.Observe(time.Since(start).Seconds())
 	}()
+
+// Make a NamedCheck for the reflector or a ReflectorCheck that checks for an
+// error bool set when the reflector gets errors.
+// Reset the bool on reconnect I guess
+// Use it in all components that use reflector
+// Maybe we should also have another check on api server healthz endpoint?
 
 loop:
 	for {
