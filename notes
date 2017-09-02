@@ -22,4 +22,5 @@ sockopt: connection refused
   when chan full or pull block when empty
 
 * ATM I've been threading a healthErrChan from KubeDeps to every NewReflector
-  and NewNamedReflector. Need to have read and write happening to it still
+  and NewNamedReflector. I'm definitely not reading/writing to it most of the
+  places it's needed still.

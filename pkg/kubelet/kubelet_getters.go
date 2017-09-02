@@ -239,3 +239,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	}
 	return volumes, nil
 }
+
+func (kl *Kubelet) GetHealthErrChan() <-chan error {
+	return kl.healthErrChan
+}

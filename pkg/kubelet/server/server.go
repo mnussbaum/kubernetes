@@ -195,6 +195,7 @@ type HostInterface interface {
 	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
+        GetHealthErrChan() (<-chan error)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -446,10 +447,12 @@ func (s *Server) syncLoopHealthCheck(req *http.Request) error {
 
 // Checks if kubelet's wooo
 func (s *Server) wooo(req *http.Request) error {
-	// if true {
-	// 	return fmt.Errorf("sync Loop took longer than expected")
-	// }
-	return nil
+        select {
+        case err := <-s.host.GetHealthErrChan():
+           return err
+        default:
+          return nil
+        }
 }
 
 // getContainerLogs handles containerLogs request against the Kubelet

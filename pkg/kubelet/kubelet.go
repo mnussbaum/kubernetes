@@ -505,6 +505,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
+                healthErrChan: kubeDeps.HealthErrChan,
 	}
 
 	secretManager := secret.NewCachingSecretManager(
@@ -1121,6 +1122,8 @@ type Kubelet struct {
 	// dockerLegacyService contains some legacy methods for backward compatibility.
 	// It should be set only when docker is using non json-file logging driver.
 	dockerLegacyService dockershim.DockerLegacyService
+
+        healthErrChan <-chan error
 }
 
 func allLocalIPsWithoutLoopback() ([]net.IP, error) {
