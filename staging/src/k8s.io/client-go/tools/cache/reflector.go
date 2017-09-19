@@ -73,7 +73,7 @@ type Reflector struct {
 	lastSyncResourceVersionMutex sync.RWMutex
 
         // channel to send errors to trigger failed healthz if watch source is unreachable
-        healthErrChan chan<- error
+        errorChan chan<- error
 }
 
 var (
@@ -90,10 +90,10 @@ func NewNamespaceKeyedIndexerAndReflector(
   lw ListerWatcher,
   expectedType interface{},
   resyncPeriod time.Duration,
-  healthErrChan chan<- error,
+  errorChan chan<- error,
 ) (indexer Indexer, reflector *Reflector) {
 	indexer = NewIndexer(MetaNamespaceKeyFunc, Indexers{"namespace": MetaNamespaceIndexFunc})
-	reflector = NewReflector(lw, expectedType, indexer, resyncPeriod, healthErrChan)
+	reflector = NewReflector(lw, expectedType, indexer, resyncPeriod, errorChan)
 	return indexer, reflector
 }
 
@@ -108,7 +108,7 @@ func NewReflector(
   expectedType interface{},
   store Store,
   resyncPeriod time.Duration,
-  healthErrChan chan<- error,
+  errorChan chan<- error,
 ) *Reflector {
 	return NewNamedReflector(
           getDefaultReflectorName(internalPackages...),
@@ -116,7 +116,7 @@ func NewReflector(
           expectedType,
           store,
           resyncPeriod,
-          healthErrChan,
+          errorChan,
         )
 }
 
@@ -131,7 +131,7 @@ func NewNamedReflector(
   expectedType interface{},
   store Store,
   resyncPeriod time.Duration,
-  healthErrChan chan<- error,
+  errorChan chan<- error,
 ) *Reflector {
 	reflectorSuffix := atomic.AddInt64(&reflectorDisambiguator, 1)
 	r := &Reflector{
@@ -144,7 +144,7 @@ func NewNamedReflector(
 		period:        time.Second,
 		resyncPeriod:  resyncPeriod,
 		clock:         &clock.RealClock{},
-                healthErrChan: healthErrChan,
+                errorChan: errorChan,
 	}
 	return r
 }
@@ -338,10 +338,12 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 				// watch closed normally
 			case io.ErrUnexpectedEOF:
 				glog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedType, err)
-                                r.healthErrChan <- fmt.Errorf("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedType, err)
+                                r.errorChan <- fmt.Errorf("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedType, err)
 			default:
 				utilruntime.HandleError(fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.expectedType, err))
-                                r.healthErrChan <- fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.expectedType, err)			}
+				glog.V(1).Infof("WOO ABOUT TO WRITE my err")
+                                r.errorChan <- fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.expectedType, err)			}
+				glog.V(1).Infof("WOO wrote my err")
 			// If this is "connection refused" error, it means that most likely apiserver is not responsive.
 			// It doesn't make sense to re-list all objects because most likely we will be able to restart
 			// watch where we ended.

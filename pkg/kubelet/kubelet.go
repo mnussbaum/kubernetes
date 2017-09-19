@@ -245,7 +245,7 @@ type Dependencies struct {
 	VolumePlugins           []volume.VolumePlugin
 	TLSOptions              *server.TLSOptions
 	KubeletConfigController *kubeletconfig.Controller
-	HealthErrChan           chan error
+	ReflectorErrorChan      chan error
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -280,7 +280,7 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
                   kubeDeps.KubeClient,
                   nodeName,
                   cfg.Channel(kubetypes.ApiserverSource),
-                  kubeDeps.HealthErrChan,
+                  kubeDeps.ReflectorErrorChan,
                 )
 	}
 	return cfg, nil
@@ -415,7 +415,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
                   &v1.Service{},
                   serviceIndexer,
                   0,
-                  kubeDeps.HealthErrChan,
+                  kubeDeps.ReflectorErrorChan,
                 )
 		go r.Run(wait.NeverStop)
 	}
@@ -430,7 +430,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
                   &v1.Node{},
                   nodeIndexer,
                   0,
-                  kubeDeps.HealthErrChan,
+                  kubeDeps.ReflectorErrorChan,
                 )
 		go r.Run(wait.NeverStop)
 	}
@@ -505,7 +505,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
-                healthErrChan: kubeDeps.HealthErrChan,
+                reflectorErrorChan: kubeDeps.ReflectorErrorChan,
 	}
 
 	secretManager := secret.NewCachingSecretManager(
@@ -1123,7 +1123,7 @@ type Kubelet struct {
 	// It should be set only when docker is using non json-file logging driver.
 	dockerLegacyService dockershim.DockerLegacyService
 
-        healthErrChan <-chan error
+        reflectorErrorChan <-chan error
 }
 
 func allLocalIPsWithoutLoopback() ([]net.IP, error) {
@@ -1739,7 +1739,6 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	plegCh := kl.pleg.Watch()
 	for {
 		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
-                  glog.V(1).Infof("WOO GOT RUNTIME ERRS: %v\n", rs)
 			glog.Infof("skipping pod synchronization - %v", rs)
 			time.Sleep(5 * time.Second)
 			continue

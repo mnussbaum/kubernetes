@@ -24,3 +24,17 @@ sockopt: connection refused
 * ATM I've been threading a healthErrChan from KubeDeps to every NewReflector
   and NewNamedReflector. I'm definitely not reading/writing to it most of the
   places it's needed still.
+
+* HealthErrChan is only read from when kubelet health check is queried with
+  `curl localhost:10255/healthz`. Need to figure out non-blocking channel that
+  will just drop messages when full to write errs to
+
+* Might be able to give reason for failing health check? But staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go:107 is confusing me
+
+TODO:
+  * Ensure check goes healthy when API server comes back
+  * Ensure check stays unhealthy while API server is down
+  * Fix channel buffering/blocking behavior
+  * Write tests on kubelet
+  * Read Reflector errors everywhere else the reflector is used
+  * Fix formatting

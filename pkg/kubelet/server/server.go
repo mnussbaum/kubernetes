@@ -195,7 +195,7 @@ type HostInterface interface {
 	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
-        GetHealthErrChan() (<-chan error)
+        GetReflectorErrorChan() (<-chan error)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -271,7 +271,7 @@ func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
 		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
-		healthz.NamedCheck("wooo", s.wooo),
+		healthz.NamedCheck("reflectorHealthCheck", s.reflectorHealthCheck),
 	)
 	ws := new(restful.WebService)
 	ws.
@@ -445,10 +445,10 @@ func (s *Server) syncLoopHealthCheck(req *http.Request) error {
 	return nil
 }
 
-// Checks if kubelet's wooo
-func (s *Server) wooo(req *http.Request) error {
+// Checks if kubelet's reflector has reported any errors
+func (s *Server) reflectorHealthCheck(req *http.Request) error {
         select {
-        case err := <-s.host.GetHealthErrChan():
+        case err := <-s.host.GetReflectorErrorChan():
            return err
         default:
           return nil

@@ -34,17 +34,17 @@ func NewSourceApiserver(
   c clientset.Interface,
   nodeName types.NodeName,
   updates chan<- interface{},
-  healthErrChan chan<- error,
+  reflectorErrorChan chan<- error,
 ) {
 	lw := cache.NewListWatchFromClient(c.Core().RESTClient(), "pods", metav1.NamespaceAll, fields.OneTermEqualSelector(api.PodHostField, string(nodeName)))
-	newSourceApiserverFromLW(lw, updates, healthErrChan)
+	newSourceApiserverFromLW(lw, updates, reflectorErrorChan)
 }
 
 // newSourceApiserverFromLW holds creates a config source that watches and pulls from the apiserver.
 func newSourceApiserverFromLW(
   lw cache.ListerWatcher,
   updates chan<- interface{},
-  healthErrChan chan<- error,
+  reflectorErrorChan chan<- error,
 ) {
 	send := func(objs []interface{}) {
 		var pods []*v1.Pod
@@ -58,7 +58,7 @@ func newSourceApiserverFromLW(
           &v1.Pod{},
           cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc),
           0,
-          healthErrChan,
+          reflectorErrorChan,
         )
 	go r.Run(wait.NeverStop)
 }
