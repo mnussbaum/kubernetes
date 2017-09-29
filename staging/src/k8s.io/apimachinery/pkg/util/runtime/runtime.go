@@ -85,7 +85,6 @@ func getCallers(r interface{}) string {
 // should be packaged up into a testable and reusable object.
 var ErrorHandlers = []func(error){
 	logError,
-	wooError,
 	(&rudimentaryErrorBackoff{
 		lastErrorTime: time.Now(),
 		// 1ms was the number folks were able to stomach as a global rate limit.
@@ -113,10 +112,6 @@ func HandleError(err error) {
 // logError prints an error with the call stack of the location it was reported
 func logError(err error) {
 	glog.ErrorDepth(2, err)
-}
-
-func wooError(err error) {
-  glog.V(1).Infof("WOO REFLECTOR ERRS: %v\n", err)
 }
 
 type rudimentaryErrorBackoff struct {

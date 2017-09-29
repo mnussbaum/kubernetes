@@ -50,7 +50,7 @@ func NewPodStore(c clientset.Interface, namespace string, label labels.Selector,
 	}
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	stopCh := make(chan struct{})
-	reflector := cache.NewReflector(lw, &v1.Pod{}, store, 0, make(chan error))
+	reflector := cache.NewReflector(lw, &v1.Pod{}, store, 0)
 	go reflector.Run(stopCh)
 	return &PodStore{Store: store, stopCh: stopCh, Reflector: reflector}
 }
