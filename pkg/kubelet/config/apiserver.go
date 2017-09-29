@@ -30,22 +30,13 @@ import (
 )
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
-func NewSourceApiserver(
-  c clientset.Interface,
-  nodeName types.NodeName,
-  updates chan<- interface{},
-  reflectorErrorChan chan<- error,
-) {
+func NewSourceApiserver(c clientset.Interface, nodeName types.NodeName, updates chan<- interface{}) {
 	lw := cache.NewListWatchFromClient(c.Core().RESTClient(), "pods", metav1.NamespaceAll, fields.OneTermEqualSelector(api.PodHostField, string(nodeName)))
-	newSourceApiserverFromLW(lw, updates, reflectorErrorChan)
+	newSourceApiserverFromLW(lw, updates)
 }
 
 // newSourceApiserverFromLW holds creates a config source that watches and pulls from the apiserver.
-func newSourceApiserverFromLW(
-  lw cache.ListerWatcher,
-  updates chan<- interface{},
-  reflectorErrorChan chan<- error,
-) {
+func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}) {
 	send := func(objs []interface{}) {
 		var pods []*v1.Pod
 		for _, o := range objs {
@@ -58,7 +49,6 @@ func newSourceApiserverFromLW(
           &v1.Pod{},
           cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc),
           0,
-          reflectorErrorChan,
         )
 	go r.Run(wait.NeverStop)
 }

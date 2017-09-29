@@ -245,7 +245,7 @@ type Dependencies struct {
 	VolumePlugins           []volume.VolumePlugin
 	TLSOptions              *server.TLSOptions
 	KubeletConfigController *kubeletconfig.Controller
-	ReflectorErrorChan      chan error
+        Reflectors              []*cache.Reflector
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -280,7 +280,6 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
                   kubeDeps.KubeClient,
                   nodeName,
                   cfg.Channel(kubetypes.ApiserverSource),
-                  kubeDeps.ReflectorErrorChan,
                 )
 	}
 	return cfg, nil
@@ -410,14 +409,14 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	if kubeDeps.KubeClient != nil {
 		serviceLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "services", metav1.NamespaceAll, fields.Everything())
-		r := cache.NewReflector(
+		serviceReflector := cache.NewReflector(
                   serviceLW,
                   &v1.Service{},
                   serviceIndexer,
                   0,
-                  kubeDeps.ReflectorErrorChan,
                 )
-		go r.Run(wait.NeverStop)
+                kubeDeps.Reflectors = append(kubeDeps.Reflectors, serviceReflector)
+		go serviceReflector.Run(wait.NeverStop)
 	}
 	serviceLister := corelisters.NewServiceLister(serviceIndexer)
 
@@ -425,14 +424,14 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if kubeDeps.KubeClient != nil {
 		fieldSelector := fields.Set{api.ObjectNameField: string(nodeName)}.AsSelector()
 		nodeLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "nodes", metav1.NamespaceAll, fieldSelector)
-		r := cache.NewReflector(
+		nodeReflector := cache.NewReflector(
                   nodeLW,
                   &v1.Node{},
                   nodeIndexer,
                   0,
-                  kubeDeps.ReflectorErrorChan,
                 )
-		go r.Run(wait.NeverStop)
+                kubeDeps.Reflectors = append(kubeDeps.Reflectors, nodeReflector)
+		go nodeReflector.Run(wait.NeverStop)
 	}
 	nodeInfo := &predicates.CachedNodeInfo{NodeLister: corelisters.NewNodeLister(nodeIndexer)}
 
@@ -505,7 +504,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
-                reflectorErrorChan: kubeDeps.ReflectorErrorChan,
+                reflectors: kubeDeps.Reflectors,
 	}
 
 	secretManager := secret.NewCachingSecretManager(
@@ -1123,7 +1122,8 @@ type Kubelet struct {
 	// It should be set only when docker is using non json-file logging driver.
 	dockerLegacyService dockershim.DockerLegacyService
 
-        reflectorErrorChan <-chan error
+        // These reflectors receive updates from the API server for the kubelet
+        reflectors []*cache.Reflector
 }
 
 func allLocalIPsWithoutLoopback() ([]net.IP, error) {

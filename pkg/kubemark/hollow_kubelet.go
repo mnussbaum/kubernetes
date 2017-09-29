@@ -76,7 +76,6 @@ func NewHollowKubelet(
 		OOMAdjuster:       oom.NewFakeOOMAdjuster(),
 		Writer:            &kubeio.StdWriter{},
 		Mounter:           mount.New("" /* default mount path */),
-                ReflectorErrorChan:     make(chan error),
 	}
 
 	return &HollowKubelet{

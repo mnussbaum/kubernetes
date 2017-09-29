@@ -166,7 +166,6 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		Writer:             writer,
 		VolumePlugins:      ProbeVolumePlugins(s.VolumePluginDir),
 		TLSOptions:         tlsOptions,
-                ReflectorErrorChan: make(chan error, 10),
 	}, nil
 }
 

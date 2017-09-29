@@ -31,6 +31,9 @@ sockopt: connection refused
 
 * Might be able to give reason for failing health check? But staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go:107 is confusing me
 
+* For the kubelet, I need to make the source api server and two reflectors live on the kubelet forever
+  then check their state directly so they can mark themseves as unhealthy and then healthy
+
 TODO:
   * Ensure check goes healthy when API server comes back
   * Ensure check stays unhealthy while API server is down

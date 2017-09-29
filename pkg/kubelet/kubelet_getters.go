@@ -240,6 +240,15 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	return volumes, nil
 }
 
-func (kl *Kubelet) GetReflectorErrorChan() <-chan error {
-	return kl.reflectorErrorChan
+func (kl *Kubelet) ReflectorsHealthy() (bool, []error) {
+  reflectorErrors := make([]error, 0, len(kl.reflectors))
+  allHealthy := true
+  for _, reflector := range kl.reflectors {
+    if healthy, reflectorError := reflector.Healthy(); !healthy {
+      reflectorErrors = append(reflectorErrors, reflectorError)
+      allHealthy = false
+    }
+  }
+
+  return allHealthy, reflectorErrors
 }
