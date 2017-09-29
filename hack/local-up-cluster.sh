@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+# KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT="/home/vagrant/gopath/src/k8s.io/kubernetes"
 
 # This command builds and runs a local kubernetes cluster.
 # You may need to run this as root to allow kubelet to open docker's socket,
@@ -167,11 +168,11 @@ do
     esac
 done
 
-if [ "x$GO_OUT" == "x" ]; then
-    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube"
-else
-    echo "skipped the build."
-fi
+# if [ "x$GO_OUT" == "x" ]; then
+#     make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube"
+# else
+#     echo "skipped the build."
+# fi
 
 function test_rkt {
     if [[ -n "${RKT_PATH}" ]]; then
@@ -498,7 +499,7 @@ function start_apiserver {
 
 
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${audit_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
+    ${CONTROLPLANE_SUDO} "/home/vagrant/gopath/src/k8s.io/kubernetes/_output/bin/hyperkube" apiserver ${swagger_arg} ${audit_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --vmodule="${LOG_SPEC}" \
@@ -850,75 +851,75 @@ EOF
 fi
 }
 
-# validate that etcd is: not running, in path, and has minimum required version.
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  kube::etcd::validate
-fi
-
-if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
-  exit 1
-fi
-
-if [[ "${CONTAINER_RUNTIME}" == "rkt" ]]; then
-  test_rkt
-fi
-
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  test_apiserver_off
-fi
-
-kube::util::test_openssl_installed
-kube::util::ensure-cfssl
-
-### IF the user didn't supply an output/ for the build... Then we detect.
-if [ "$GO_OUT" == "" ]; then
-  detect_binary
-fi
-echo "Detected host and ready to start services.  Doing some housekeeping first..."
-echo "Using GO_OUT $GO_OUT"
-KUBELET_CIDFILE=/tmp/kubelet.cid
-if [[ "${ENABLE_DAEMON}" = false ]]; then
-  trap cleanup EXIT
-fi
-
+# # validate that etcd is: not running, in path, and has minimum required version.
+# if [[ "${START_MODE}" != "kubeletonly" ]]; then
+#   kube::etcd::validate
+# fi
+#
+# if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
+#   exit 1
+# fi
+#
+# if [[ "${CONTAINER_RUNTIME}" == "rkt" ]]; then
+#   test_rkt
+# fi
+#
+# if [[ "${START_MODE}" != "kubeletonly" ]]; then
+#   test_apiserver_off
+# fi
+#
+# kube::util::test_openssl_installed
+# kube::util::ensure-cfssl
+#
+# ### IF the user didn't supply an output/ for the build... Then we detect.
+# if [ "$GO_OUT" == "" ]; then
+#   detect_binary
+# fi
+# echo "Detected host and ready to start services.  Doing some housekeeping first..."
+# echo "Using GO_OUT $GO_OUT"
+# KUBELET_CIDFILE=/tmp/kubelet.cid
+# if [[ "${ENABLE_DAEMON}" = false ]]; then
+#   trap cleanup EXIT
+# fi
+#
 echo "Starting services now!"
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  start_etcd
+  # start_etcd
   set_service_accounts
   start_apiserver
-  start_controller_manager
-  start_kubeproxy
-  start_kubedns
-  start_kubedashboard
+  # start_controller_manager
+  # start_kubeproxy
+  # start_kubedns
+  # start_kubedashboard
 fi
 
-if [[ "${START_MODE}" != "nokubelet" ]]; then
-  ## TODO remove this check if/when kubelet is supported on darwin
-  # Detect the OS name/arch and display appropriate error.
-    case "$(uname -s)" in
-      Darwin)
-        warning "kubelet is not currently supported in darwin, kubelet aborted."
-        KUBELET_LOG=""
-        ;;
-      Linux)
-        start_kubelet
-        ;;
-      *)
-        warning "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."
-        ;;
-    esac
-fi
-
-if [[ -n "${PSP_ADMISSION}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
-  create_psp_policy
-fi
-
-if [[ "$DEFAULT_STORAGE_CLASS" = "true" ]]; then
-  create_storage_class
-fi
-
-print_success
-
-if [[ "${ENABLE_DAEMON}" = false ]]; then
-  while true; do sleep 1; done
-fi
+# if [[ "${START_MODE}" != "nokubelet" ]]; then
+#   ## TODO remove this check if/when kubelet is supported on darwin
+#   # Detect the OS name/arch and display appropriate error.
+#     case "$(uname -s)" in
+#       Darwin)
+#         warning "kubelet is not currently supported in darwin, kubelet aborted."
+#         KUBELET_LOG=""
+#         ;;
+#       Linux)
+#         start_kubelet
+#         ;;
+#       *)
+#         warning "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."
+#         ;;
+#     esac
+# fi
+#
+# if [[ -n "${PSP_ADMISSION}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
+#   create_psp_policy
+# fi
+#
+# if [[ "$DEFAULT_STORAGE_CLASS" = "true" ]]; then
+#   create_storage_class
+# fi
+#
+# print_success
+#
+# if [[ "${ENABLE_DAEMON}" = false ]]; then
+#   while true; do sleep 1; done
+# fi
