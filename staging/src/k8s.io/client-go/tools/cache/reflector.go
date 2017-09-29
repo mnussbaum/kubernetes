@@ -71,6 +71,10 @@ type Reflector struct {
 	lastSyncResourceVersion string
 	// lastSyncResourceVersionMutex guards read/write access to lastSyncResourceVersion
 	lastSyncResourceVersionMutex sync.RWMutex
+
+       // If the last API list/watch request returned an error then it will be set here.
+       // This is used to determine if the Reflector is currently healthy.
+       listWatchError error
 }
 
 var (
@@ -116,6 +120,7 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 		period:        time.Second,
 		resyncPeriod:  resyncPeriod,
 		clock:         &clock.RealClock{},
+               listWatchError: nil,
 	}
 	return r
 }
@@ -248,6 +253,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	start := r.clock.Now()
 	list, err := r.listerWatcher.List(options)
 	if err != nil {
+               r.listWatchError = err
 		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
 	}
 	r.metrics.listDuration.Observe(time.Since(start).Seconds())
@@ -313,7 +319,8 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 				glog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedType, err)
 			default:
 				utilruntime.HandleError(fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.expectedType, err))
-			}
+                               r.listWatchError = err
+                       }
 			// If this is "connection refused" error, it means that most likely apiserver is not responsive.
 			// It doesn't make sense to re-list all objects because most likely we will be able to restart
 			// watch where we ended.
@@ -328,6 +335,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			}
 			return nil
 		}
+               r.listWatchError = nil
 
 		if err := r.watchHandler(w, &resourceVersion, resyncerrc, stopCh); err != nil {
 			if err != errorStopRequested {
@@ -439,4 +447,16 @@ func (r *Reflector) setLastSyncResourceVersion(v string) {
 	if err == nil {
 		r.metrics.lastResourceVersion.Set(float64(rv))
 	}
+}
+
+// Healthy returns a boolean that will be false if the Reflector has most
+// recently recevied an error response on its list/watch attempts.
+// If the Reflector is unhealthy and the boolean return value is false then the
+// last observed error will also be returned.
+func (r *Reflector) Healthy() (bool, error) {
+	if r.listWatchError != nil {
+          return false, r.listWatchError
+       }
+
+       return true, nil
 }
