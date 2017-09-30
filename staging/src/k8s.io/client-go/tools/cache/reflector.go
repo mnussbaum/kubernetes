@@ -454,9 +454,9 @@ func (r *Reflector) setLastSyncResourceVersion(v string) {
 // If the Reflector is unhealthy and the boolean return value is false then the
 // last observed error will also be returned.
 func (r *Reflector) Healthy() (bool, error) {
-	if r.listWatchError != nil {
-          return false, r.listWatchError
-       }
+      if r.listWatchError != nil {
+        return false, r.listWatchError
+      }
 
        return true, nil
 }

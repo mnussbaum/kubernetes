@@ -180,6 +180,10 @@ func (_ *fakeKubelet) GetCgroupStats(cgroupName string) (*statsapi.ContainerStat
 	return nil, nil, nil
 }
 
+func (_ *fakeKubelet) ReflectorsHealthy() (bool, []error) {
+	return true, []error{}
+}
+
 type fakeAuth struct {
 	authenticateFunc func(*http.Request) (user.Info, bool, error)
 	attributesFunc   func(user.Info, *http.Request) authorizer.Attributes
