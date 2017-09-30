@@ -83,6 +83,7 @@ type fakeKubelet struct {
 	loopEntryTime                      time.Time
 	plegHealth                         bool
 	redirectURL                        *url.URL
+	reflectorsHealthyFunc              func() (bool, []error)
 }
 
 func (fk *fakeKubelet) ResyncInterval() time.Duration {
@@ -180,8 +181,8 @@ func (_ *fakeKubelet) GetCgroupStats(cgroupName string) (*statsapi.ContainerStat
 	return nil, nil, nil
 }
 
-func (_ *fakeKubelet) ReflectorsHealthy() (bool, []error) {
-	return true, []error{}
+func (fk *fakeKubelet) ReflectorsHealthy() (bool, []error) {
+	return fk.reflectorsHealthyFunc()
 }
 
 type fakeAuth struct {
@@ -213,6 +214,9 @@ func newServerTest() *serverTestFramework {
 	fw.fakeKubelet = &fakeKubelet{
 		hostnameFunc: func() string {
 			return "127.0.0.1"
+		},
+		reflectorsHealthyFunc: func() (bool, []error) {
+			return true, []error{}
 		},
 		podByNameFunc: func(namespace, name string) (*v1.Pod, bool) {
 			return &v1.Pod{
@@ -568,6 +572,21 @@ func TestHealthCheck(t *testing.T) {
 		return "fake"
 	}
 	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
+}
+
+func TestReflectorsHealthCheck(t *testing.T) {
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+	fw.fakeKubelet.reflectorsHealthyFunc = func() (bool, []error) {
+		return true, []error{}
+	}
+
+	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
+
+	fw.fakeKubelet.reflectorsHealthyFunc = func() (bool, []error) {
+		return false, []error{fmt.Errorf("fake reflector error")}
+	}
+	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
 }
 
 func assertHealthFails(t *testing.T, httpURL string, expectedErrorCode int) {
